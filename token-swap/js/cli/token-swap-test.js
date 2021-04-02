@@ -491,6 +491,29 @@ export async function swap(): Promise<void> {
   }
 }
 
+export async function calculateSwapReturn(): Promise<void> {
+  console.log('*** calculateSwapReturn ***');
+  let userAccountA = await mintA.createAccount(owner.publicKey);
+  await mintA.mintTo(userAccountA, owner, [], SWAP_AMOUNT_IN);
+
+  const resAccount = new Account();
+  console.log("resAccount:", resAccount.publicKey.toString());
+  console.log('calculateSwapReturn');
+  await tokenSwap.calculateSwapReturn(
+    tokenAccountA,
+    tokenAccountB,
+    resAccount,
+    SWAP_AMOUNT_IN,
+    1,
+    1,
+  );
+
+  await sleep(500);
+
+  let info = await connection.getAccountInfo(resAccount.publicKey);
+  console.log(info);
+}
+
 function tradingTokensToPoolTokens(
   sourceAmount: number,
   swapSourceAmount: number,

@@ -18,9 +18,10 @@ import {
 import * as Layout from './layout';
 import {sendAndConfirmTransaction} from './util/send-and-confirm-transaction';
 import {loadAccount} from './util/account';
-
+//3dSBFmJ6zvMmeDCXrP1N9CXBYs65rbHxpCRRyHSRgyZD
+//SwaPpA9LAaLfeLi3a68M4DjnLqgtticKg6CnyNwgAC8
 export const TOKEN_SWAP_PROGRAM_ID: PublicKey = new PublicKey(
-  'SwaPpA9LAaLfeLi3a68M4DjnLqgtticKg6CnyNwgAC8',
+  '3dSBFmJ6zvMmeDCXrP1N9CXBYs65rbHxpCRRyHSRgyZD',
 );
 
 /**
@@ -635,6 +636,95 @@ export class TokenSwap {
     if (hostFeeAccount != null) {
       keys.push({pubkey: hostFeeAccount, isSigner: false, isWritable: true});
     }
+    return new TransactionInstruction({
+      keys,
+      programId: swapProgramId,
+      data,
+    });
+  }
+
+  async calculateSwapReturn(
+    poolSource: PublicKey,
+    poolDestination: PublicKey,
+    resAccount:Account,
+    amountIn: number | Numberu64,
+    partition: number | Numberu64,
+    flags:number | Numberu64,
+  ): Promise<TransactionSignature> {
+
+    const balanceNeeded = await TokenSwap.getMinBalanceRentForExemptTokenSwap(
+      this.connection,
+    );
+    let transaction = new Transaction();
+    let l: typeof BufferLayout.Structure = BufferLayout.struct([
+      Layout.uint64('distribution'),
+      Layout.i128('out_amount'),
+    ]);
+    transaction.add(
+      SystemProgram.createAccount({
+        fromPubkey: this.payer.publicKey,
+        newAccountPubkey: resAccount.publicKey,
+        lamports: balanceNeeded,
+        space: l.span,
+        programId: this.swapProgramId,
+      }),
+    );
+    return await sendAndConfirmTransaction(
+      'calculateSwapReturn',
+      this.connection,
+      transaction.add(
+        TokenSwap.calculateSwapReturnInstruction(
+          this.tokenSwap,
+          poolSource,
+          poolDestination,
+          resAccount.publicKey,
+          this.swapProgramId,
+          amountIn,
+          partition,
+          flags,
+        ),
+      ),
+      this.payer,
+      resAccount,
+    );
+  }
+
+  static calculateSwapReturnInstruction(
+    tokenSwap: PublicKey,
+    poolSource: PublicKey,
+    poolDestination: PublicKey,
+    resAccount: PublicKey,
+    swapProgramId: PublicKey,
+    amountIn: number | Numberu64,
+    partition: number | Numberu64,
+    flags: number | Numberu64,
+  ): TransactionInstruction {
+    const dataLayout = BufferLayout.struct([
+      BufferLayout.u8('instruction'),
+      Layout.uint64('amountIn'),
+      Layout.uint64('partition'),
+      Layout.uint64('flags'),
+    ]);
+    console.log(amountIn);
+    console.log(partition);
+    console.log(flags);
+    const data = Buffer.alloc(dataLayout.span);
+    dataLayout.encode(
+      {
+        instruction: 6, // Swap instruction
+        amountIn: new Numberu64(amountIn).toBuffer(),
+        partition: new Numberu64(partition).toBuffer(),
+        flags: new Numberu64(flags).toBuffer(),
+      },
+      data,
+    );
+
+    const keys = [
+      {pubkey: tokenSwap, isSigner: false, isWritable: false},
+      {pubkey: poolSource, isSigner: false, isWritable: true},
+      {pubkey: poolDestination, isSigner: false, isWritable: true},
+      {pubkey: resAccount, isSigner: true, isWritable: true},
+    ];
     return new TransactionInstruction({
       keys,
       programId: swapProgramId,

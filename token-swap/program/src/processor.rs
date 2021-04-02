@@ -1,6 +1,11 @@
 //! Program state processor
 
 use crate::constraints::{SwapConstraints, SWAP_CONSTRAINTS};
+use crate::instruction::CalculateSwapReturn;
+use crate::state::CalculateSwapReturnRes;
+use crate::utils::{
+    calculate_swap_return, find_distribution, get_real_out_amount, interpolation, to_u128,
+};
 use crate::{
     curve::{
         base::SwapCurve,
@@ -366,9 +371,6 @@ impl Processor {
         if swap_source_info.key == source_info.key {
             return Err(SwapError::InvalidInput.into());
         }
-        if swap_destination_info.key == destination_info.key {
-            return Err(SwapError::InvalidInput.into());
-        }
         if *pool_mint_info.key != *token_swap.pool_mint() {
             return Err(SwapError::IncorrectPoolMint.into());
         }
@@ -488,6 +490,81 @@ impl Processor {
             to_u64(result.destination_amount_swapped)?,
         )?;
 
+        Ok(())
+    }
+    /// Processes an [DepositAllTokenTypes](enum.Instruction.html).
+    pub fn process_calculate_swap_return(
+        program_id: &Pubkey,
+        amount_in: u64,
+        partition: u64,
+        flags: u64,
+        accounts: &[AccountInfo],
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let swap_info = next_account_info(account_info_iter)?;
+        let swap_source_info = next_account_info(account_info_iter)?;
+        let swap_destination_info = next_account_info(account_info_iter)?;
+        let res_account_info = next_account_info(account_info_iter)?;
+
+        if swap_info.owner != program_id {
+            return Err(ProgramError::IncorrectProgramId);
+        }
+        let token_swap = SwapVersion::unpack(&swap_info.data.borrow())?;
+
+        if !(*swap_source_info.key == *token_swap.token_a_account()
+            || *swap_source_info.key == *token_swap.token_b_account())
+        {
+            return Err(SwapError::IncorrectSwapAccount.into());
+        }
+        if !(*swap_destination_info.key == *token_swap.token_a_account()
+            || *swap_destination_info.key == *token_swap.token_b_account())
+        {
+            return Err(SwapError::IncorrectSwapAccount.into());
+        }
+        if *swap_source_info.key == *swap_destination_info.key {
+            return Err(SwapError::InvalidInput.into());
+        }
+
+        let source_account =
+            Self::unpack_token_account(swap_source_info, &token_swap.token_program_id())?;
+        let dest_account =
+            Self::unpack_token_account(swap_destination_info, &token_swap.token_program_id())?;
+        // let pool_mint = Self::unpack_mint(pool_mint_info, &token_swap.token_program_id())?;
+
+        let trade_direction = if *swap_source_info.key == *token_swap.token_a_account() {
+            TradeDirection::AtoB
+        } else {
+            TradeDirection::BtoA
+        };
+
+        let in_amounts = interpolation(amount_in, partition);
+        let res = calculate_swap_return(
+            token_swap,
+            in_amounts.as_slice(),
+            source_account.amount,
+            dest_account.amount,
+            trade_direction,
+        );
+        msg!("res length:{}", res.len());
+        let mut matrix: Vec<i128> = res
+            .iter()
+            .map(|item| item.destination_amount_swapped as i128)
+            .collect();
+        let l = matrix.len();
+        if l < (partition + 1) as usize {
+            for _ in l..(partition + 1) as usize {
+                matrix.push(0);
+            }
+        }
+        msg!("matrix:{:?}", matrix.as_slice());
+        let distribution = find_distribution(partition, &[matrix.as_slice()]);
+        let out_amount = get_real_out_amount(distribution.as_slice(), matrix.as_slice());
+        let obj = CalculateSwapReturnRes {
+            distribution: distribution[0],
+            out_amount,
+        };
+        msg!("length:{}", res_account_info.data.borrow().len());
+        CalculateSwapReturnRes::pack(obj, &mut res_account_info.data.borrow_mut())?;
         Ok(())
     }
 
@@ -1025,8 +1102,19 @@ impl Processor {
                 amount_in,
                 minimum_amount_out,
             }) => {
-                msg!("Instruction: Swap");
+                msg!("Instruction: Swap*****");
                 Self::process_swap(program_id, amount_in, minimum_amount_out, accounts)
+            }
+            SwapInstruction::CalculateSwapReturn(CalculateSwapReturn {
+                amount_in,
+                partition,
+                flags,
+            }) => {
+                msg!("Instruction: CalculateSwapReturn");
+                msg! {"amount_in:{}, partition:{}, flags:{}", amount_in, partition, flags};
+                Self::process_calculate_swap_return(
+                    program_id, amount_in, partition, flags, accounts,
+                )
             }
             SwapInstruction::DepositAllTokenTypes(DepositAllTokenTypes {
                 pool_token_amount,
@@ -1154,10 +1242,6 @@ impl PrintProgramError for SwapError {
             }
         }
     }
-}
-
-fn to_u128(val: u64) -> Result<u128, SwapError> {
-    val.try_into().map_err(|_| SwapError::ConversionFailure)
 }
 
 fn to_u64(val: u128) -> Result<u64, SwapError> {

@@ -40,6 +40,19 @@ pub struct Swap {
     pub minimum_amount_out: u64,
 }
 
+/// CalculateSwapReturn instruction data
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CalculateSwapReturn {
+    /// amount_in
+    pub amount_in: u64,
+    /// partition
+    pub partition: u64,
+    /// flags
+    pub flags: u64,
+}
+
 /// DepositAllTokenTypes instruction data
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[repr(C)]
@@ -124,6 +137,9 @@ pub enum SwapInstruction {
     ///   9. '[]` Token program id
     ///   10 `[optional, writable]` Host fee account to receive additional trading fees
     Swap(Swap),
+
+    ///   CalculateSwapReturn the tokens in the pool.
+    CalculateSwapReturn(CalculateSwapReturn),
 
     ///   Deposit both types of tokens into the pool.  The output is a "pool"
     ///   token representing ownership in the pool. Inputs are converted to
@@ -253,6 +269,16 @@ impl SwapInstruction {
                     maximum_pool_token_amount,
                 })
             }
+            6 => {
+                let (amount_in, rest) = Self::unpack_u64(rest)?;
+                let (partition, _rest) = Self::unpack_u64(rest)?;
+                let (flags, _rest) = Self::unpack_u64(rest)?;
+                Self::CalculateSwapReturn(CalculateSwapReturn {
+                    amount_in,
+                    partition,
+                    flags,
+                })
+            }
             _ => return Err(SwapError::InvalidInstruction.into()),
         })
     }
@@ -334,6 +360,16 @@ impl SwapInstruction {
                 buf.push(5);
                 buf.extend_from_slice(&destination_token_amount.to_le_bytes());
                 buf.extend_from_slice(&maximum_pool_token_amount.to_le_bytes());
+            }
+            Self::CalculateSwapReturn(CalculateSwapReturn {
+                amount_in,
+                partition,
+                flags,
+            }) => {
+                buf.push(6);
+                buf.extend_from_slice(&amount_in.to_le_bytes());
+                buf.extend_from_slice(&partition.to_le_bytes());
+                buf.extend_from_slice(&flags.to_le_bytes());
             }
         }
         buf
