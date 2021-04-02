@@ -8,6 +8,7 @@ import {
   createAccountAndSwapAtomic,
   createTokenSwap,
   swap,
+  calculateSwapReturn,
   depositAllTokenTypes,
   withdrawAllTokenTypes,
   depositSingleTokenTypeExactAmountIn,
@@ -25,6 +26,9 @@ async function main() {
   console.log('Run test: swap');
   await swap();
   console.log('Run test: create account, approve, swap all at once');
+
+  await calculateSwapReturn();
+
   await createAccountAndSwapAtomic();
   console.log('Run test: deposit one exact amount in');
   await depositSingleTokenTypeExactAmountIn();

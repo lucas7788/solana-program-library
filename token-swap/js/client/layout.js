@@ -16,6 +16,10 @@ export const uint64 = (property: string = 'uint64'): Object => {
   return BufferLayout.blob(8, property);
 };
 
+export const i128 = (property: string = 'i128'): Object => {
+  return BufferLayout.blob(16, property);
+};
+
 /**
  * Layout for a Rust String type
  */

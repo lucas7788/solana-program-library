@@ -9,6 +9,44 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
+///CalculateSwapReturnRes
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CalculateSwapReturnRes {
+    /// distribution
+    pub distribution: u64,
+    /// out_amount
+    pub out_amount: i128,
+}
+
+impl Sealed for CalculateSwapReturnRes {}
+
+impl Pack for CalculateSwapReturnRes {
+    const LEN: usize = 24;
+
+    fn pack_into_slice(&self, dst: &mut [u8]) {
+        let dst = array_mut_ref![dst, 0, 24];
+        let (distribution_dst, out_amount_dst) = mut_array_refs![dst, 8, 16];
+        let &CalculateSwapReturnRes {
+            distribution,
+            out_amount,
+        } = self;
+        *distribution_dst = distribution.to_le_bytes();
+        *out_amount_dst = out_amount.to_le_bytes();
+    }
+
+    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
+        let src = array_ref![src, 0, 24];
+        let (distribution, out_amount) = array_refs![src, 8, 16];
+        let distribution = u64::from_le_bytes(*distribution);
+        let out_amount = i128::from_le_bytes(*out_amount);
+        Ok(CalculateSwapReturnRes {
+            distribution,
+            out_amount,
+        })
+    }
+}
+
 /// Trait representing access to program state across all versions
 #[enum_dispatch]
 pub trait SwapState {
