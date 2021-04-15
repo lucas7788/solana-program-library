@@ -497,7 +497,6 @@ impl Processor {
         program_id: &Pubkey,
         amount_in: u64,
         partition: u64,
-        flags: u64,
         accounts: &[AccountInfo],
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
@@ -1112,9 +1111,7 @@ impl Processor {
             }) => {
                 msg!("Instruction: CalculateSwapReturn");
                 msg! {"amount_in:{}, partition:{}, flags:{}", amount_in, partition, flags};
-                Self::process_calculate_swap_return(
-                    program_id, amount_in, partition, flags, accounts,
-                )
+                Self::process_calculate_swap_return(program_id, amount_in, partition, accounts)
             }
             SwapInstruction::DepositAllTokenTypes(DepositAllTokenTypes {
                 pool_token_amount,
