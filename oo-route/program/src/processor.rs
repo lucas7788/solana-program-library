@@ -56,6 +56,7 @@ impl Processor {
         let user_transfer_authority_info = next_account_info(account_info_iter)?;
         let source_info = next_account_info(account_info_iter)?;
         let destination_info = next_account_info(account_info_iter)?;
+        let token_program_info = next_account_info(account_info_iter)?;
 
         //获取 swap info相关的信息
         for i in (0..swap_info_len).into_iter() {
@@ -65,7 +66,6 @@ impl Processor {
             let swap_destination_info = next_account_info(account_info_iter)?;
             let pool_mint_info = next_account_info(account_info_iter)?;
             let pool_fee_account_info = next_account_info(account_info_iter)?;
-            let token_program_info = next_account_info(account_info_iter)?;
 
             if swap_info.owner != program_id {
                 return Err(ProgramError::IncorrectProgramId);
@@ -102,6 +102,7 @@ impl Processor {
                 return Err(SwapError::IncorrectTokenProgramId.into());
             }
 
+            // TODO
             let swap_bytes = swap_info.key.to_bytes();
             let nonce = token_swap.nonce();
             let authority_signature_seeds = [&swap_bytes[..32], &[nonce]];

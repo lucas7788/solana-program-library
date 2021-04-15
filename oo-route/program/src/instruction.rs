@@ -28,12 +28,12 @@ impl OOSwapInstruction {
             0 => {
                 let (&swap_info_len, rest) =
                     rest.split_first().ok_or(SwapError::InvalidInstruction)?;
-                let size = rest.len() / 16;
-                if size % 16 != 0 {
+                if rest.len() % 16 != 0 {
                     //必须是16的整数倍
                     return Err(SwapError::InvalidInstruction.into());
                 }
-                if (size / 16) as u8 != swap_info_len {
+                let size = rest.len() / 16;
+                if size as u8 != swap_info_len {
                     //swap info 的长度和amount_in的长度 必须一样
                     return Err(SwapError::InvalidInstruction.into());
                 }
