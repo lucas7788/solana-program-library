@@ -10,6 +10,7 @@ use std::mem::size_of;
 use crate::state::OOSwapStruct;
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
+use spl_token_swap::instruction::Swap;
 
 /// Instructions supported by the token swap program.
 #[repr(C)]
@@ -25,19 +26,31 @@ impl OOSwapInstruction {
         let (&tag, rest) = input.split_first().ok_or(SwapError::InvalidInstruction)?;
         Ok(match tag {
             0 => {
-                if rest.len() % 16 != 0 {
+                let (&swap_info_len, rest) =
+                    rest.split_first().ok_or(SwapError::InvalidInstruction)?;
+                let size = rest.len() / 16;
+                if size % 16 != 0 {
                     //必须是16的整数倍
                     return Err(SwapError::InvalidInstruction.into());
                 }
-                let size = rest.len() / 16;
+                if (size / 16) as u8 != swap_info_len {
+                    //swap info 的长度和amount_in的长度 必须一样
+                    return Err(SwapError::InvalidInstruction.into());
+                }
+
                 let mut data = vec![];
                 for _ in (0..size).into_iter() {
                     let (amount_in, rest) = Self::unpack_u64(rest)?;
                     let (minimum_amount_out, _rest) = Self::unpack_u64(rest)?;
-                    data.push(amount_in);
-                    data.push(minimum_amount_out);
+                    data.push(Swap {
+                        amount_in,
+                        minimum_amount_out,
+                    });
                 }
-                Self::OOSwap(OOSwapStruct { data })
+                Self::OOSwap(OOSwapStruct {
+                    data,
+                    swap_info_len,
+                })
             }
             _ => return Err(SwapError::InvalidInstruction.into()),
         })

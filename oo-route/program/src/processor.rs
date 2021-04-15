@@ -46,73 +46,69 @@ impl Processor {
     /// process_swap
     pub fn process_swap(
         program_id: &Pubkey,
-        data: Vec<u64>,
+        data: Vec<Swap>,
+        swap_info_len: u8,
         accounts: &[AccountInfo],
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
-        let swap_info = next_account_info(account_info_iter)?;
-        let authority_info = next_account_info(account_info_iter)?;
+
+        // 用户相关的account info
         let user_transfer_authority_info = next_account_info(account_info_iter)?;
         let source_info = next_account_info(account_info_iter)?;
-        let swap_source_info = next_account_info(account_info_iter)?;
-        let swap_destination_info = next_account_info(account_info_iter)?;
         let destination_info = next_account_info(account_info_iter)?;
-        let pool_mint_info = next_account_info(account_info_iter)?;
-        let pool_fee_account_info = next_account_info(account_info_iter)?;
-        let token_program_info = next_account_info(account_info_iter)?;
 
-        if swap_info.owner != program_id {
-            return Err(ProgramError::IncorrectProgramId);
-        }
-        let token_swap = SwapVersion::unpack(&swap_info.data.borrow())?;
+        //获取 swap info相关的信息
+        for i in (0..swap_info_len).into_iter() {
+            let swap_info = next_account_info(account_info_iter)?;
+            let authority_info = next_account_info(account_info_iter)?;
+            let swap_source_info = next_account_info(account_info_iter)?;
+            let swap_destination_info = next_account_info(account_info_iter)?;
+            let pool_mint_info = next_account_info(account_info_iter)?;
+            let pool_fee_account_info = next_account_info(account_info_iter)?;
+            let token_program_info = next_account_info(account_info_iter)?;
 
-        if *authority_info.key != Self::authority_id(program_id, swap_info.key, token_swap.nonce())?
-        {
-            return Err(SwapError::InvalidProgramAddress.into());
-        }
-        if !(*swap_source_info.key == *token_swap.token_a_account()
-            || *swap_source_info.key == *token_swap.token_b_account())
-        {
-            return Err(SwapError::IncorrectSwapAccount.into());
-        }
-        if !(*swap_destination_info.key == *token_swap.token_a_account()
-            || *swap_destination_info.key == *token_swap.token_b_account())
-        {
-            return Err(SwapError::IncorrectSwapAccount.into());
-        }
-        if *swap_source_info.key == *swap_destination_info.key {
-            return Err(SwapError::InvalidInput.into());
-        }
-        if swap_source_info.key == source_info.key {
-            return Err(SwapError::InvalidInput.into());
-        }
-        if *pool_mint_info.key != *token_swap.pool_mint() {
-            return Err(SwapError::IncorrectPoolMint.into());
-        }
-        if *pool_fee_account_info.key != *token_swap.pool_fee_account() {
-            return Err(SwapError::IncorrectFeeAccount.into());
-        }
-        if *token_program_info.key != *token_swap.token_program_id() {
-            return Err(SwapError::IncorrectTokenProgramId.into());
-        }
-
-        let swap_bytes = swap_info.key.to_bytes();
-        let nonce = token_swap.nonce();
-        let authority_signature_seeds = [&swap_bytes[..32], &[nonce]];
-        let signers = &[&authority_signature_seeds[..]];
-
-        let (mut amount_in, mut minimum_amount_out) = (0u64, 0u64);
-        for (i, &item) in data.iter().enumerate() {
-            if i % 2 == 0 {
-                amount_in = item;
-            } else {
-                minimum_amount_out = item;
+            if swap_info.owner != program_id {
+                return Err(ProgramError::IncorrectProgramId);
             }
-            if amount_in == 0 {
-                continue;
+            let token_swap = SwapVersion::unpack(&swap_info.data.borrow())?;
+            if *authority_info.key
+                != Self::authority_id(program_id, swap_info.key, token_swap.nonce())?
+            {
+                return Err(SwapError::InvalidProgramAddress.into());
             }
+            if !(*swap_source_info.key == *token_swap.token_a_account()
+                || *swap_source_info.key == *token_swap.token_b_account())
+            {
+                return Err(SwapError::IncorrectSwapAccount.into());
+            }
+            if !(*swap_destination_info.key == *token_swap.token_a_account()
+                || *swap_destination_info.key == *token_swap.token_b_account())
+            {
+                return Err(SwapError::IncorrectSwapAccount.into());
+            }
+            if *swap_source_info.key == *swap_destination_info.key {
+                return Err(SwapError::InvalidInput.into());
+            }
+            if swap_source_info.key == source_info.key {
+                return Err(SwapError::InvalidInput.into());
+            }
+            if *pool_mint_info.key != *token_swap.pool_mint() {
+                return Err(SwapError::IncorrectPoolMint.into());
+            }
+            if *pool_fee_account_info.key != *token_swap.pool_fee_account() {
+                return Err(SwapError::IncorrectFeeAccount.into());
+            }
+            if *token_program_info.key != *token_swap.token_program_id() {
+                return Err(SwapError::IncorrectTokenProgramId.into());
+            }
+
+            let swap_bytes = swap_info.key.to_bytes();
+            let nonce = token_swap.nonce();
+            let authority_signature_seeds = [&swap_bytes[..32], &[nonce]];
+            let signers = &[&authority_signature_seeds[..]];
+
             let ix = swap(
-                program_id,
+                program_id, //TODO 这个 是不是应该修改成 调用的合约的地址
                 token_program_info.key,
                 swap_info.key,
                 authority_info.key,
@@ -124,10 +120,7 @@ impl Processor {
                 pool_mint_info.key,
                 pool_fee_account_info.key,
                 None,
-                Swap {
-                    amount_in,
-                    minimum_amount_out,
-                },
+                data[i as usize].clone(),
             )?;
             let res = invoke_signed(
                 &ix,
@@ -165,9 +158,12 @@ impl Processor {
     ) -> ProgramResult {
         let instruction = OOSwapInstruction::unpack(input)?;
         match instruction {
-            OOSwapInstruction::OOSwap(OOSwapStruct { data }) => {
+            OOSwapInstruction::OOSwap(OOSwapStruct {
+                data,
+                swap_info_len,
+            }) => {
                 msg!("Instruction: OOSwap");
-                Self::process_swap(program_id, data, accounts)
+                Self::process_swap(program_id, data, swap_info_len, accounts)
             }
         }
     }

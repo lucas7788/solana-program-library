@@ -7,6 +7,7 @@ use solana_program::{
     pubkey::Pubkey,
 };
 use spl_token_swap::curve::{base::SwapCurve, fees::Fees};
+use spl_token_swap::instruction::Swap;
 
 /// Swap instruction data
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
@@ -14,7 +15,9 @@ use spl_token_swap::curve::{base::SwapCurve, fees::Fees};
 #[derive(Clone, Debug, PartialEq)]
 pub struct OOSwapStruct {
     /// data
-    pub data: Vec<u64>,
+    pub data: Vec<Swap>,
+    /// swap_info_len
+    pub swap_info_len: u8,
 }
 
 /// Trait representing access to program state across all versions
