@@ -166,7 +166,7 @@ impl Processor {
         let instruction = OOSwapInstruction::unpack(input)?;
         match instruction {
             OOSwapInstruction::OOSwap(OOSwapStruct { data }) => {
-                msg!("Instruction: CalculateSwapReturn");
+                msg!("Instruction: OOSwap");
                 Self::process_swap(program_id, data, accounts)
             }
         }
