@@ -6309,6 +6309,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "spl-token-escrow"
+version = "3.0.0"
+dependencies = [
+ "arbitrary",
+ "arrayref",
+ "enum_dispatch",
+ "num-derive",
+ "num-traits",
+ "proptest",
+ "roots",
+ "solana-program",
+ "solana-sdk",
+ "spl-math",
+ "spl-token 3.5.0",
+ "spl-token-2022 0.4.3",
+ "test-case",
+ "thiserror",
+]
+
+[[package]]
 name = "spl-token-lending"
 version = "0.2.0"
 dependencies = [
