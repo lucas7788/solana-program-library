@@ -72,7 +72,7 @@ impl EscrowVersion {
     /// all versions
     pub fn is_initialized(input: &[u8]) -> bool {
         match Self::unpack(input) {
-            Ok(swap) => swap.is_initialized(),
+            Ok(escrow_state) => escrow_state.is_initialized(),
             Err(_) => false,
         }
     }
@@ -95,10 +95,10 @@ pub struct EscrowV1 {
     // pub token_program_id: Pubkey,
 
     /// Token A
-    pub token_a: Pubkey,
+    pub token: Pubkey,
 
     /// Mint information for token A
-    pub token_a_mint: Pubkey,
+    pub token_mint: Pubkey,
 }
 
 impl EscrowState for EscrowV1 {
@@ -115,11 +115,11 @@ impl EscrowState for EscrowV1 {
     // }
 
     fn token_account(&self) -> &Pubkey {
-        &self.token_a
+        &self.token
     }
 
     fn token_mint(&self) -> &Pubkey {
-        &self.token_a_mint
+        &self.token_mint
     }
 }
 
@@ -131,24 +131,24 @@ impl IsInitialized for EscrowV1 {
 }
 
 impl Pack for EscrowV1 {
-    const LEN: usize = 98;
+    const LEN: usize = 66;
 
     fn pack_into_slice(&self, output: &mut [u8]) {
-        let output = array_mut_ref![output, 0, 98];
-        let (is_initialized, bump_seed, token_program_id, token_a, token_a_mint) =
-            mut_array_refs![output, 1, 1, 32, 32, 32];
+        let output = array_mut_ref![output, 0, 66];
+        let (is_initialized, bump_seed, token_a, token_a_mint) =
+            mut_array_refs![output, 1, 1, 32, 32];
         is_initialized[0] = self.is_initialized as u8;
         bump_seed[0] = self.bump_seed;
-        token_a.copy_from_slice(self.token_a.as_ref());
-        token_a_mint.copy_from_slice(self.token_a_mint.as_ref());
+        token_a.copy_from_slice(self.token.as_ref());
+        token_a_mint.copy_from_slice(self.token_mint.as_ref());
     }
 
     /// Unpacks a byte buffer into a [SwapV1](struct.SwapV1.html).
     fn unpack_from_slice(input: &[u8]) -> Result<Self, ProgramError> {
-        let input = array_ref![input, 0, 98];
+        let input = array_ref![input, 0, 66];
         #[allow(clippy::ptr_offset_with_cast)]
-        let (is_initialized, bump_seed, token_program_id, token_a, token_a_mint) =
-            array_refs![input, 1, 1, 32, 32, 32];
+        let (is_initialized, bump_seed, token_a, token_a_mint) =
+            array_refs![input, 1, 1, 32, 32];
         Ok(Self {
             is_initialized: match is_initialized {
                 [0] => false,
@@ -156,8 +156,8 @@ impl Pack for EscrowV1 {
                 _ => return Err(ProgramError::InvalidAccountData),
             },
             bump_seed: bump_seed[0],
-            token_a: Pubkey::new_from_array(*token_a),
-            token_a_mint: Pubkey::new_from_array(*token_a_mint),
+            token: Pubkey::new_from_array(*token_a),
+            token_mint: Pubkey::new_from_array(*token_a_mint),
         })
     }
 }
@@ -179,8 +179,8 @@ mod tests {
         let swap_info = EscrowVersion::EscrowV1(EscrowV1 {
             is_initialized: true,
             bump_seed: TEST_BUMP_SEED,
-            token_a: TEST_TOKEN_A,
-            token_a_mint: TEST_TOKEN_A_MINT,
+            token: TEST_TOKEN_A,
+            token_mint: TEST_TOKEN_A_MINT,
         });
 
         let mut packed = [0u8; EscrowVersion::LATEST_LEN];
@@ -205,8 +205,8 @@ mod tests {
         let swap_info = EscrowV1 {
             is_initialized: true,
             bump_seed: TEST_BUMP_SEED,
-            token_a: TEST_TOKEN_A,
-            token_a_mint: TEST_TOKEN_A_MINT,
+            token: TEST_TOKEN_A,
+            token_mint: TEST_TOKEN_A_MINT,
         };
 
         let mut packed = [0u8; EscrowV1::LEN];

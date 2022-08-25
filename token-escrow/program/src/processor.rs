@@ -131,9 +131,10 @@ impl Processor {
     pub fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let escrow_info = next_account_info(account_info_iter)?;
+        // token-escrow authority account
         let authority_info = next_account_info(account_info_iter)?;
-        let token_a_info = next_account_info(account_info_iter)?;
-        let destination_info = next_account_info(account_info_iter)?;
+        // owned by token-escrow authority account
+        let token_info = next_account_info(account_info_iter)?;
 
         if EscrowVersion::is_initialized(&escrow_info.data.borrow()) {
             return Err(EscrowError::AlreadyInUse.into());
@@ -145,13 +146,13 @@ impl Processor {
             return Err(EscrowError::InvalidProgramAddress.into());
         }
 
-        // let obj = EscrowVersion::EscrowV1(EscrowV1 {
-        //     is_initialized: true,
-        //     bump_seed,
-        //     token_a: *token_a_info.key,
-        //     token_a_mint: token_a.mint,
-        // });
-        // EscrowVersion::pack(obj, &mut escrow_info.data.borrow_mut())?;
+        let obj = EscrowVersion::EscrowV1(EscrowV1 {
+            is_initialized: true,
+            bump_seed,
+            token: *token_info.key,
+            token_mint: *token_info.key,// 可能也不需要
+        });
+        EscrowVersion::pack(obj, &mut escrow_info.data.borrow_mut())?;
         Ok(())
     }
 
