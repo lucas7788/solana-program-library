@@ -31,6 +31,7 @@ members = [
   "token-lending/program",
   "token-swap/program",
   "token-swap/program/fuzz",
+  "token-swap/program/sim",
   "token/cli",
   "token/program",
   "token/program-2022",
@@ -39,6 +40,7 @@ members = [
   "utils/cgen",
   "utils/test-client",
   "token-lending/flash_loan_receiver",
+  "token-escrow/program",
 ]
 exclude = [
   "farms/farm-client",
